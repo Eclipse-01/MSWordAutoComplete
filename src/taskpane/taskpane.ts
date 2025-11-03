@@ -3,8 +3,6 @@
  * See LICENSE in the project root for license information.
  */
 
-/* global document, Office */
-
 import * as React from "react";
 import * as ReactDOM from "react-dom";
 import { initializeIcons } from "@fluentui/react";

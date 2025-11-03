@@ -17,7 +17,7 @@ function action(event: Office.AddinCommands.Event) {
   // 简单完成命令，主要功能在任务窗格中
   // Word 加载项不使用通知消息系统
   console.log("Word 智能补全命令已执行");
-  
+
   // Be sure to indicate when the add-in command function is complete.
   event.completed();
 }

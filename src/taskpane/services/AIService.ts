@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from "axios";
+import { GitHubCopilotClient, createCopilotClient } from "./GitHubCopilotClient";
 
 interface Settings {
   apiProvider: "github" | "openai" | "custom";
@@ -19,6 +20,7 @@ interface Message {
 export class AIService {
   private settings: Settings;
   private axiosInstance: AxiosInstance;
+  private copilotClient: GitHubCopilotClient | null = null;
 
   constructor() {
     this.loadSettings();
@@ -61,10 +63,9 @@ export class AIService {
 
     switch (this.settings.apiProvider) {
       case "github":
-        // 注意：GitHub Copilot API 端点可能不同
-        // 实际使用时需要根据 GitHub Copilot 的官方文档配置
-        // 这里提供的是一个占位符示例
-        baseURL = "https://api.github.com/copilot";
+        // 注意：使用官方的 GitHub Copilot 语言服务器（Electron）
+        // 或者作为后备，使用 GitHub API
+        baseURL = "https://api.github.com";
         apiKey = this.settings.githubToken;
         break;
       case "openai":
@@ -85,6 +86,22 @@ export class AIService {
       },
       timeout: 30000,
     });
+  }
+
+  /**
+   * 初始化 GitHub Copilot 客户端（仅 Electron）
+   */
+  private async ensureCopilotClient() {
+    if (this.settings.apiProvider === "github" && !this.copilotClient) {
+      this.copilotClient = createCopilotClient({
+        githubToken: this.settings.githubToken,
+      });
+      
+      const initialized = await this.copilotClient.initialize();
+      if (!initialized) {
+        throw new Error("无法初始化 GitHub Copilot 客户端");
+      }
+    }
   }
 
   /**
@@ -136,18 +153,41 @@ export class AIService {
 
   /**
    * 从 GitHub Copilot 获取补全
+   * 使用官方语言服务器（Electron）或 GitHub API（浏览器）
    */
   private async getGitHubCopilotCompletion(text: string): Promise<string> {
     try {
-      // GitHub Copilot API 端点（注意：这是一个简化的示例）
-      // 在生产环境中，您需要使用实际的 GitHub Copilot API
-      const response = await this.axiosInstance.post("/completions", {
-        prompt: text,
-        max_tokens: this.settings.maxTokens,
-        temperature: this.settings.temperature,
-      });
+      // 尝试使用官方 Copilot 语言服务器（Electron）
+      if (typeof window !== 'undefined' && (window as any).isElectron) {
+        await this.ensureCopilotClient();
+        
+        if (this.copilotClient && this.copilotClient.isSignedIn()) {
+          // 构造补全请求参数
+          const lines = text.split('\n');
+          const lastLine = lines[lines.length - 1];
+          
+          const completions = await this.copilotClient.getInlineCompletion({
+            uri: 'file:///document.txt',
+            position: {
+              line: lines.length - 1,
+              character: lastLine.length
+            },
+            context: { triggerKind: 1 }, // 自动触发
+            version: 0
+          });
 
-      return response.data.choices[0].text || response.data.choices[0].message?.content || "";
+          if (completions && completions.length > 0) {
+            return completions[0].insertText;
+          }
+        }
+      }
+
+      // 后备：如果不在 Electron 中，提示用户
+      throw new Error(
+        "GitHub Copilot 需要在 Electron 应用中使用。" +
+        "请下载桌面版本，或使用 OpenAI/自定义 API。"
+      );
+
     } catch (error) {
       console.error("GitHub Copilot 错误:", error);
       throw error;
@@ -242,6 +282,28 @@ export class AIService {
     } catch (error) {
       console.error("生成文本时出错:", error);
       throw new Error("生成文本失败");
+    }
+  }
+
+  /**
+   * GitHub Copilot 登录（仅 Electron）
+   */
+  async copilotSignIn(): Promise<{ userCode: string; verificationUri: string }> {
+    await this.ensureCopilotClient();
+    
+    if (!this.copilotClient) {
+      throw new Error("GitHub Copilot 客户端未初始化");
+    }
+
+    return await this.copilotClient.signIn();
+  }
+
+  /**
+   * GitHub Copilot 登出（仅 Electron）
+   */
+  async copilotSignOut(): Promise<void> {
+    if (this.copilotClient) {
+      await this.copilotClient.signOut();
     }
   }
 }

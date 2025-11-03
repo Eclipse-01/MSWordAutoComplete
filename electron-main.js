@@ -1,8 +1,10 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
+const CopilotLanguageServer = require('./electron-copilot-server');
 
 let mainWindow;
+let copilotServer = null;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -13,6 +15,7 @@ function createWindow() {
       nodeIntegration: true,
       contextIsolation: false,
       enableRemoteModule: true,
+      preload: path.join(__dirname, 'electron-preload.js'),
     },
     icon: path.join(__dirname, 'assets/icon-128.png'),
   });
@@ -47,6 +50,9 @@ app.whenReady().then(() => {
 
 // 所有窗口关闭
 app.on('window-all-closed', function () {
+  if (copilotServer) {
+    copilotServer.stop();
+  }
   if (process.platform !== 'darwin') app.quit();
 });
 
@@ -73,7 +79,74 @@ autoUpdater.on('update-downloaded', () => {
   });
 });
 
-// IPC 通信 - 用于与渲染进程通信
+// GitHub Copilot IPC 处理
+
+// 初始化 Copilot
+ipcMain.handle('copilot-initialize', async (event, config) => {
+  try {
+    if (!copilotServer) {
+      copilotServer = new CopilotLanguageServer();
+      await copilotServer.start();
+    }
+    return { success: true };
+  } catch (error) {
+    console.error('初始化 Copilot 失败:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// 登录
+ipcMain.handle('copilot-sign-in', async () => {
+  try {
+    if (!copilotServer) {
+      throw new Error('Copilot 服务器未初始化');
+    }
+    const result = await copilotServer.signIn();
+    return result;
+  } catch (error) {
+    console.error('Copilot 登录失败:', error);
+    throw error;
+  }
+});
+
+// 登出
+ipcMain.handle('copilot-sign-out', async () => {
+  try {
+    if (copilotServer) {
+      await copilotServer.signOut();
+    }
+  } catch (error) {
+    console.error('Copilot 登出失败:', error);
+    throw error;
+  }
+});
+
+// 获取补全
+ipcMain.handle('copilot-get-completion', async (event, params) => {
+  try {
+    if (!copilotServer) {
+      throw new Error('Copilot 服务器未初始化');
+    }
+    const result = await copilotServer.getInlineCompletion(params);
+    return result;
+  } catch (error) {
+    console.error('获取 Copilot 补全失败:', error);
+    throw error;
+  }
+});
+
+// 接受补全
+ipcMain.handle('copilot-accept-completion', async (event, completionId) => {
+  try {
+    if (copilotServer) {
+      await copilotServer.acceptCompletion(completionId);
+    }
+  } catch (error) {
+    console.error('接受补全失败:', error);
+  }
+});
+
+// 通用 IPC 处理
 ipcMain.on('get-app-version', (event) => {
   event.reply('app-version', app.getVersion());
 });

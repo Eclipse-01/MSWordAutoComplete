@@ -1,5 +1,8 @@
 # Word 智能补全
 
+[![Build and Release](https://github.com/Eclipse-01/MSWordAutoComplete/actions/workflows/build-and-release.yml/badge.svg)](https://github.com/Eclipse-01/MSWordAutoComplete/actions/workflows/build-and-release.yml)
+[![CI](https://github.com/Eclipse-01/MSWordAutoComplete/actions/workflows/ci.yml/badge.svg)](https://github.com/Eclipse-01/MSWordAutoComplete/actions/workflows/ci.yml)
+
 > **第三方开发的 Microsoft Word 加载项，与 Microsoft 官方无关**
 
 这是一个为 Microsoft Word 提供类似 GitHub Copilot 自动补全功能的第三方插件。支持 GitHub Copilot 模型（通过 GitHub 登录）和自定义 OpenAI 风格接口的模型。
@@ -12,19 +15,43 @@
 - **自动编辑**：基于指令自动编辑和改进文本
 - **Word API 集成**：无缝集成 Word API 进行文档操作
 - **多 AI 提供商支持**：
-  - GitHub Copilot
+  - GitHub Copilot（官方语言服务器）
   - OpenAI（GPT-3.5、GPT-4）
   - 自定义 OpenAI 兼容 API
 
 ## 📋 前置要求
 
 - Microsoft Word 2016 或更新版本（Windows、Mac 或 Web）
-- Node.js 14.x 或更高版本
+- Node.js 20.x 或更高版本（如需从源码构建）
 - npm 或 yarn
 - API 密钥：
-  - GitHub 个人访问令牌（用于 GitHub Copilot）
+  - GitHub Copilot 订阅（用于 GitHub Copilot，仅 Electron 版）
   - OpenAI API 密钥（用于 OpenAI 模型）
   - 或自定义 API 端点和密钥
+
+## 📦 下载预构建包
+
+### 从 GitHub Releases 下载
+
+访问 [Releases 页面](https://github.com/Eclipse-01/MSWordAutoComplete/releases)下载最新版本：
+
+- **Office 加载项**：`MSWordAutoComplete-Office-Addin-*.zip`
+- **Windows 应用**：`Word智能补全-Setup-*.exe`
+- **Mac 应用**：`Word智能补全-*.dmg`
+- **Linux 应用**：`Word智能补全-*.AppImage`
+
+### 使用 GitHub Actions 构建
+
+如果您想从最新代码构建：
+
+1. Fork 本仓库
+2. 进入 Actions 标签页
+3. 选择 "Quick Build - 快速构建"
+4. 点击 "Run workflow"
+5. 选择要构建的平台
+6. 等待构建完成后下载 Artifacts
+
+详见 [GitHub Actions 工作流说明](.github/workflows/README.md)
 
 ## 🚀 安装
 

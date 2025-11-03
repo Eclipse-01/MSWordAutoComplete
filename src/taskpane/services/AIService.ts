@@ -96,7 +96,7 @@ export class AIService {
       this.copilotClient = createCopilotClient({
         githubToken: this.settings.githubToken,
       });
-      
+
       const initialized = await this.copilotClient.initialize();
       if (!initialized) {
         throw new Error("无法初始化 GitHub Copilot 客户端");
@@ -158,22 +158,22 @@ export class AIService {
   private async getGitHubCopilotCompletion(text: string): Promise<string> {
     try {
       // 尝试使用官方 Copilot 语言服务器（Electron）
-      if (typeof window !== 'undefined' && (window as any).isElectron) {
+      if (typeof window !== "undefined" && (window as any).isElectron) {
         await this.ensureCopilotClient();
-        
+
         if (this.copilotClient && this.copilotClient.isSignedIn()) {
           // 构造补全请求参数
-          const lines = text.split('\n');
+          const lines = text.split("\n");
           const lastLine = lines[lines.length - 1];
-          
+
           const completions = await this.copilotClient.getInlineCompletion({
-            uri: 'file:///document.txt',
+            uri: "file:///document.txt",
             position: {
               line: lines.length - 1,
-              character: lastLine.length
+              character: lastLine.length,
             },
             context: { triggerKind: 1 }, // 自动触发
-            version: 0
+            version: 0,
           });
 
           if (completions && completions.length > 0) {
@@ -184,10 +184,8 @@ export class AIService {
 
       // 后备：如果不在 Electron 中，提示用户
       throw new Error(
-        "GitHub Copilot 需要在 Electron 应用中使用。" +
-        "请下载桌面版本，或使用 OpenAI/自定义 API。"
+        "GitHub Copilot 需要在 Electron 应用中使用。" + "请下载桌面版本，或使用 OpenAI/自定义 API。"
       );
-
     } catch (error) {
       console.error("GitHub Copilot 错误:", error);
       throw error;
@@ -290,7 +288,7 @@ export class AIService {
    */
   async copilotSignIn(): Promise<{ userCode: string; verificationUri: string }> {
     await this.ensureCopilotClient();
-    
+
     if (!this.copilotClient) {
       throw new Error("GitHub Copilot 客户端未初始化");
     }

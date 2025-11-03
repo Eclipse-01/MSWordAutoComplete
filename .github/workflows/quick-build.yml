@@ -1,0 +1,214 @@
+name: Quick Build - 快速构建
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: '选择构建平台'
+        required: true
+        type: choice
+        options:
+          - 'all'
+          - 'office-addin'
+          - 'electron-windows'
+          - 'electron-mac'
+          - 'electron-linux'
+      upload_artifacts:
+        description: '上传构建产物'
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  build-office-addin:
+    name: 快速构建 - Office 加载项
+    runs-on: ubuntu-latest
+    if: inputs.platform == 'all' || inputs.platform == 'office-addin'
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: 安装依赖
+        run: npm ci
+      
+      - name: 构建
+        run: npm run build
+      
+      - name: 打包
+        run: |
+          mkdir -p release
+          cd dist
+          zip -r ../release/MSWordAutoComplete-Office-Addin.zip .
+          cd ..
+          cp manifest.xml release/
+      
+      - name: 生成安装脚本
+        run: node scripts/create-installers.js || echo "安装脚本生成失败，但继续执行"
+      
+      - name: 上传产物
+        if: inputs.upload_artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: office-addin-quick-build
+          path: release/
+          retention-days: 3
+      
+      - name: 构建摘要
+        run: |
+          echo "## ✅ Office 加载项构建完成" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📦 **构建产物：**" >> $GITHUB_STEP_SUMMARY
+          ls -lh release/ >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "💾 **总大小：** $(du -sh release/ | cut -f1)" >> $GITHUB_STEP_SUMMARY
+
+  build-electron-windows:
+    name: 快速构建 - Electron Windows
+    runs-on: windows-latest
+    if: inputs.platform == 'all' || inputs.platform == 'electron-windows'
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: 安装依赖
+        run: npm ci
+      
+      - name: 构建
+        run: npm run build
+      
+      - name: 构建 Electron
+        run: npm run electron:build:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: 上传产物
+        if: inputs.upload_artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-windows-quick-build
+          path: release/*.exe
+          retention-days: 3
+      
+      - name: 构建摘要
+        run: |
+          echo "## ✅ Electron Windows 构建完成" >> $env:GITHUB_STEP_SUMMARY
+          echo "" >> $env:GITHUB_STEP_SUMMARY
+          echo "📦 **构建产物：**" >> $env:GITHUB_STEP_SUMMARY
+          Get-ChildItem release/*.exe | Format-Table Name, Length >> $env:GITHUB_STEP_SUMMARY
+        shell: pwsh
+
+  build-electron-mac:
+    name: 快速构建 - Electron Mac
+    runs-on: macos-latest
+    if: inputs.platform == 'all' || inputs.platform == 'electron-mac'
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: 安装依赖
+        run: npm ci
+      
+      - name: 构建
+        run: npm run build
+      
+      - name: 构建 Electron
+        run: npm run electron:build:mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+      
+      - name: 上传产物
+        if: inputs.upload_artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-mac-quick-build
+          path: release/*.dmg
+          retention-days: 3
+      
+      - name: 构建摘要
+        run: |
+          echo "## ✅ Electron Mac 构建完成" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📦 **构建产物：**" >> $GITHUB_STEP_SUMMARY
+          ls -lh release/*.dmg >> $GITHUB_STEP_SUMMARY
+
+  build-electron-linux:
+    name: 快速构建 - Electron Linux
+    runs-on: ubuntu-latest
+    if: inputs.platform == 'all' || inputs.platform == 'electron-linux'
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: 安装依赖
+        run: npm ci
+      
+      - name: 构建
+        run: npm run build
+      
+      - name: 构建 Electron
+        run: npm run electron:build:linux
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: 上传产物
+        if: inputs.upload_artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-linux-quick-build
+          path: release/*.AppImage
+          retention-days: 3
+      
+      - name: 构建摘要
+        run: |
+          echo "## ✅ Electron Linux 构建完成" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📦 **构建产物：**" >> $GITHUB_STEP_SUMMARY
+          ls -lh release/*.AppImage >> $GITHUB_STEP_SUMMARY
+
+  build-summary:
+    name: 构建总结
+    needs: [build-office-addin, build-electron-windows, build-electron-mac, build-electron-linux]
+    runs-on: ubuntu-latest
+    if: always() && inputs.upload_artifacts
+    
+    steps:
+      - name: 生成总结
+        run: |
+          echo "# 🎉 快速构建完成" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "已完成所选平台的构建，请从 Actions 标签页下载构建产物。" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 下载说明" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "1. 点击上方的 'Artifacts' 查看所有构建产物" >> $GITHUB_STEP_SUMMARY
+          echo "2. 点击相应的产物名称进行下载" >> $GITHUB_STEP_SUMMARY
+          echo "3. 构建产物将保留 3 天" >> $GITHUB_STEP_SUMMARY

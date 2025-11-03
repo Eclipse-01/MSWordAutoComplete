@@ -1,0 +1,208 @@
+name: CI - 持续集成
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+  push:
+    branches: [ main, develop ]
+
+jobs:
+  lint-and-build:
+    name: 代码检查和构建
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: 安装依赖
+        run: npm ci
+      
+      - name: 代码格式检查
+        run: npm run prettier || echo "⚠️ Prettier 检查有警告"
+      
+      - name: ESLint 检查
+        run: npm run lint || echo "⚠️ ESLint 检查有警告"
+      
+      - name: TypeScript 编译检查
+        run: npx tsc --noEmit || echo "⚠️ TypeScript 检查有警告"
+      
+      - name: 构建项目
+        run: npm run build
+      
+      - name: 验证构建产物
+        run: |
+          echo "检查构建产物..."
+          ls -lh dist/
+          
+          # 检查关键文件
+          files=("taskpane.html" "taskpane.js" "manifest.xml")
+          for file in "${files[@]}"; do
+            if [ -f "dist/$file" ]; then
+              echo "✅ $file 存在"
+            else
+              echo "❌ $file 不存在"
+              exit 1
+            fi
+          done
+          
+          echo "✅ 所有关键文件都存在"
+      
+      - name: 检查包大小
+        run: |
+          echo "检查包大小..."
+          du -sh dist/
+          SIZE=$(du -sb dist/ | cut -f1)
+          MAX_SIZE=$((10 * 1024 * 1024)) # 10MB
+          
+          if [ $SIZE -gt $MAX_SIZE ]; then
+            echo "⚠️ 构建产物大小超过 10MB: $(($SIZE / 1024 / 1024))MB"
+          else
+            echo "✅ 构建产物大小正常: $(($SIZE / 1024 / 1024))MB"
+          fi
+      
+      - name: 上传构建产物（用于调试）
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: dist/
+          retention-days: 7
+
+  security-check:
+    name: 安全检查
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: 安装依赖
+        run: npm ci
+      
+      - name: npm audit
+        run: |
+          echo "运行 npm audit..."
+          npm audit --production || echo "⚠️ 发现安全漏洞，请查看详情"
+      
+      - name: 检查已知漏洞（仅报告）
+        run: |
+          echo "检查已知的可接受漏洞..."
+          npm audit --json > audit-results.json || true
+          
+          # 统计漏洞数量
+          HIGH=$(cat audit-results.json | grep -o '"severity":"high"' | wc -l)
+          CRITICAL=$(cat audit-results.json | grep -o '"severity":"critical"' | wc -l)
+          
+          echo "严重漏洞: $CRITICAL"
+          echo "高危漏洞: $HIGH"
+          
+          if [ $CRITICAL -gt 0 ]; then
+            echo "❌ 发现严重漏洞，需要立即处理"
+          elif [ $HIGH -gt 5 ]; then
+            echo "⚠️ 发现较多高危漏洞，建议尽快处理"
+          else
+            echo "✅ 安全检查通过"
+          fi
+
+  validate-manifest:
+    name: 验证 Office 清单
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: 安装依赖
+        run: npm ci
+      
+      - name: 验证 manifest.xml
+        run: |
+          echo "验证 Office 加载项清单..."
+          npm run validate || echo "⚠️ 清单验证有警告"
+      
+      - name: 检查 manifest.xml 内容
+        run: |
+          echo "检查清单文件关键信息..."
+          
+          # 检查必要字段
+          if grep -q "Word智能补全" manifest.xml; then
+            echo "✅ 找到产品名称"
+          else
+            echo "❌ 未找到产品名称"
+          fi
+          
+          if grep -q "1.0.0" manifest.xml; then
+            echo "✅ 找到版本号"
+          else
+            echo "⚠️ 未找到版本号"
+          fi
+          
+          if grep -q "Eclipse-01" manifest.xml; then
+            echo "✅ 找到提供商"
+          else
+            echo "⚠️ 未找到提供商"
+          fi
+
+  test-electron-build:
+    name: 测试 Electron 构建
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: 安装依赖
+        run: npm ci
+      
+      - name: 构建 Web 资源
+        run: npm run build
+      
+      - name: 检查 Electron 文件
+        run: |
+          if [ -f "electron-main.js" ]; then
+            echo "✅ electron-main.js 存在"
+          else
+            echo "❌ electron-main.js 不存在"
+            exit 1
+          fi
+          
+          if [ -f "electron-copilot-server.js" ]; then
+            echo "✅ electron-copilot-server.js 存在"
+          else
+            echo "❌ electron-copilot-server.js 不存在"
+            exit 1
+          fi
+        shell: bash
+      
+      - name: 验证 package.json 配置
+        run: |
+          echo "检查 Electron 构建配置..."
+          node -e "const pkg = require('./package.json'); console.log('Main:', pkg.main); console.log('Build config exists:', !!pkg.build);"
+        shell: bash

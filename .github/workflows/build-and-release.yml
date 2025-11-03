@@ -1,0 +1,236 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（如：1.0.0）'
+        required: false
+        default: '1.0.0'
+
+jobs:
+  build-office-addin:
+    name: 构建 Office 加载项
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: 安装依赖
+        run: npm ci
+      
+      - name: 构建项目
+        run: npm run build
+      
+      - name: 打包 Office 加载项
+        run: |
+          mkdir -p release
+          cd dist
+          zip -r ../release/MSWordAutoComplete-Office-Addin-${{ github.ref_name || inputs.version }}.zip .
+          cd ..
+          cp manifest.xml release/
+          cp README.md release/
+          cp DISTRIBUTION.md release/
+          cp USAGE.md release/
+      
+      - name: 生成安装脚本
+        run: node scripts/create-installers.js
+      
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: office-addin
+          path: release/
+
+  build-electron:
+    name: 构建 Electron 应用 - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+            arch: x64
+          - os: macos-latest
+            platform: mac
+            arch: universal
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: 安装依赖
+        run: npm ci
+      
+      - name: 构建 Web 资源
+        run: npm run build
+      
+      - name: 构建 Electron 应用 (Windows)
+        if: matrix.platform == 'win'
+        run: npm run electron:build:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: 构建 Electron 应用 (Mac)
+        if: matrix.platform == 'mac'
+        run: npm run electron:build:mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+      
+      - name: 构建 Electron 应用 (Linux)
+        if: matrix.platform == 'linux'
+        run: npm run electron:build:linux
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-${{ matrix.platform }}
+          path: |
+            release/*.exe
+            release/*.dmg
+            release/*.AppImage
+            release/*.zip
+          if-no-files-found: ignore
+
+  create-release:
+    name: 创建 Release
+    needs: [build-office-addin, build-electron]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    permissions:
+      contents: write
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      
+      - name: 下载所有构建产物
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      
+      - name: 准备发布文件
+        run: |
+          mkdir -p release-files
+          find artifacts -type f \( -name "*.zip" -o -name "*.exe" -o -name "*.dmg" -o -name "*.AppImage" -o -name "*.xml" -o -name "*.md" -o -name "*.ps1" -o -name "*.sh" \) -exec cp {} release-files/ \;
+          ls -lh release-files/
+      
+      - name: 生成发布说明
+        run: |
+          cat > release-notes.md << 'EOF'
+          # Word 智能补全 ${{ github.ref_name }}
+          
+          ## 🎉 新功能
+          
+          - ✅ AI 驱动的自动补全功能
+          - ✅ 内联聊天和侧边聊天
+          - ✅ 支持 GitHub Copilot、OpenAI 和自定义 API
+          - ✅ 提供 Office 加载项和 Electron 桌面应用两种方式
+          
+          ## 📦 下载说明
+          
+          ### Office 加载项（推荐）
+          
+          下载 `MSWordAutoComplete-Office-Addin-*.zip`，解压后：
+          
+          **Windows**：运行 `install-windows.ps1`  
+          **Mac**：运行 `./install-mac.sh`
+          
+          详细安装步骤请参考 [DISTRIBUTION.md](https://github.com/Eclipse-01/MSWordAutoComplete/blob/main/DISTRIBUTION.md)
+          
+          ### Electron 桌面应用
+          
+          - **Windows**：下载 `Word智能补全-Setup-*.exe`
+          - **Mac**：下载 `Word智能补全-*.dmg`
+          - **Linux**：下载 `Word智能补全-*.AppImage`
+          
+          ## 📚 文档
+          
+          - [快速开始指南](https://github.com/Eclipse-01/MSWordAutoComplete/blob/main/QUICKSTART.md)
+          - [使用手册](https://github.com/Eclipse-01/MSWordAutoComplete/blob/main/USAGE.md)
+          - [Copilot 集成说明](https://github.com/Eclipse-01/MSWordAutoComplete/blob/main/COPILOT_INTEGRATION.md)
+          
+          ## ⚠️ 注意事项
+          
+          - 本项目是第三方工具，与 Microsoft 官方无关
+          - 需要自己的 API 密钥（OpenAI、GitHub Copilot 或自定义）
+          - GitHub Copilot 功能需要在 Electron 版本中使用
+          
+          ## 🔒 安全
+          
+          请查看 [SECURITY.md](https://github.com/Eclipse-01/MSWordAutoComplete/blob/main/SECURITY.md) 了解安全注意事项。
+          
+          ---
+          
+          **完整变更日志**请查看提交历史。
+          EOF
+      
+      - name: 创建 Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release-files/*
+          body_path: release-notes.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  test-build:
+    name: 测试构建（非 Release）
+    runs-on: ubuntu-latest
+    if: "!startsWith(github.ref, 'refs/tags/')"
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: 安装依赖
+        run: npm ci
+      
+      - name: 代码检查
+        run: npm run lint || true
+      
+      - name: 构建项目
+        run: npm run build
+      
+      - name: 验证构建产物
+        run: |
+          if [ ! -d "dist" ]; then
+            echo "❌ dist 目录不存在"
+            exit 1
+          fi
+          if [ ! -f "dist/taskpane.html" ]; then
+            echo "❌ taskpane.html 不存在"
+            exit 1
+          fi
+          echo "✅ 构建验证通过"

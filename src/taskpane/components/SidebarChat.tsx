@@ -86,7 +86,7 @@ export class SidebarChat extends React.Component<{}, SidebarChatState> {
       };
 
       this.setState({
-        messages: [...this.state.messages, userMessage, assistantMessage],
+        messages: [...this.state.messages, assistantMessage],
         isLoading: false,
       });
     } catch (error) {

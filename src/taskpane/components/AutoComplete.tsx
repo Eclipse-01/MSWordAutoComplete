@@ -57,7 +57,7 @@ export class AutoComplete extends React.Component<{}, AutoCompleteState> {
   cleanupAutoComplete = () => {
     Office.context.document.removeHandlerAsync(
       Office.EventType.DocumentSelectionChanged,
-      { handler: this.handleSelectionChange }
+      this.handleSelectionChange
     );
   };
 

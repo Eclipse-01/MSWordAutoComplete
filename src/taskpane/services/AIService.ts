@@ -61,6 +61,9 @@ export class AIService {
 
     switch (this.settings.apiProvider) {
       case "github":
+        // 注意：GitHub Copilot API 端点可能不同
+        // 实际使用时需要根据 GitHub Copilot 的官方文档配置
+        // 这里提供的是一个占位符示例
         baseURL = "https://api.github.com/copilot";
         apiKey = this.settings.githubToken;
         break;

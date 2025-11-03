@@ -14,19 +14,10 @@ Office.onReady(() => {
  * @param event
  */
 function action(event: Office.AddinCommands.Event) {
-  const message: Office.NotificationMessageDetails = {
-    type: Office.MailboxEnums.ItemNotificationMessageType.InformationalMessage,
-    message: "Performed action.",
-    icon: "Icon.80x80",
-    persistent: true,
-  };
-
-  // Show a notification message.
-  Office.context.mailbox.item.notificationMessages.replaceAsync(
-    "ActionPerformanceNotification",
-    message
-  );
-
+  // 简单完成命令，主要功能在任务窗格中
+  // Word 加载项不使用通知消息系统
+  console.log("Word 智能补全命令已执行");
+  
   // Be sure to indicate when the add-in command function is complete.
   event.completed();
 }

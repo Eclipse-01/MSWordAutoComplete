@@ -28,6 +28,58 @@
 
 ## 🚀 安装
 
+### 方式一：直接安装（推荐）
+
+下载最新版本的分发包：
+
+1. 访问 [Releases 页面](https://github.com/Eclipse-01/MSWordAutoComplete/releases)
+2. 下载 `MSWordAutoComplete-v{version}.zip`
+3. 解压到本地文件夹
+4. 按照以下操作系统的说明安装
+
+#### Windows 用户
+
+**自动安装（推荐）**：
+1. 右键点击 `install-windows.ps1`
+2. 选择"使用 PowerShell 运行"
+3. 按照提示操作
+
+**手动安装**：
+1. 打开 Word，点击"文件" > "选项" > "信任中心" > "信任中心设置"
+2. 选择"受信任的加载项目录"
+3. 添加解压文件夹的路径
+4. 重启 Word
+5. 点击"插入" > "我的加载项" > "共享文件夹"
+6. 选择"Word 智能补全"
+
+#### Mac 用户
+
+**自动安装（推荐）**：
+1. 在终端中运行：`./install-mac.sh`
+2. 按照提示操作
+
+**手动安装**：
+1. 将解压的文件夹复制到：`~/Library/Containers/com.microsoft.Word/Data/Documents/wef`
+2. 如果 `wef` 文件夹不存在，请创建它
+3. 重启 Word
+4. 点击"插入" > "加载项" > "我的加载项"
+5. 选择"Word 智能补全"
+
+### 方式二：Electron 桌面应用
+
+下载独立桌面应用：
+
+1. 访问 [Releases 页面](https://github.com/Eclipse-01/MSWordAutoComplete/releases)
+2. 下载对应平台的安装包：
+   - Windows: `Word智能补全-Setup-{version}.exe`
+   - Mac: `Word智能补全-{version}.dmg`
+   - Linux: `Word智能补全-{version}.AppImage`
+3. 安装并运行
+
+Electron 版本提供独立的桌面应用体验，无需在 Word 中安装加载项。
+
+### 方式三：从源码安装（开发者）
+
 1. 克隆此仓库：
 ```bash
 git clone https://github.com/Eclipse-01/MSWordAutoComplete.git
@@ -93,6 +145,43 @@ npm run build
 ```bash
 npm run dev-server
 ```
+
+### 在 Word 中调试
+```bash
+npm start
+```
+
+### 打包分发
+
+#### 打包 Office 加载项
+```bash
+npm run pack
+```
+生成：`release/MSWordAutoComplete-v{version}.zip`
+
+#### 构建 Electron 应用
+
+**所有平台**：
+```bash
+npm run electron:build
+```
+
+**Windows**：
+```bash
+npm run electron:build:win
+```
+
+**Mac**：
+```bash
+npm run electron:build:mac
+```
+
+**Linux**：
+```bash
+npm run electron:build:linux
+```
+
+生成的安装包位于 `release/` 目录。
 
 ### 代码检查
 ```bash
